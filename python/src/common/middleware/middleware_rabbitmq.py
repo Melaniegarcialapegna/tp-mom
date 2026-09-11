@@ -161,7 +161,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
 
     def _setup_consumer(self):
         # If is the firt time that the consumer is going to consume, it needs to create a anonimus queue and bind it to the exchange
-        result = self.channel.queue_declare(queue='', durable=True)
+        result = self.channel.queue_declare(queue='', durable=True, exclusive=True)
         self.queue_name = result.method.queue
 
         # Bind the queue to the exchange with all the routing keys
