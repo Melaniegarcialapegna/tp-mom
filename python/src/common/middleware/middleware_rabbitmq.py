@@ -28,12 +28,31 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
         except pika.exceptions.AMQPConnectionError as error:
             raise MessageMiddlewareDisconnectedError(str(error))
+        
         except pika.exceptions.AMQPError as error:
             raise MessageMiddlewareMessageError(str(error))
         
-        
     def start_consuming(self, on_message_callback):
-        pass
+        # Transform the format of pika to the format of the middleware
+        def _on_message_callback_internal(channel,method,propierties,body):
+            def ack():
+                channel.basic_ack(delivery_tag=method.delivery_tag)
+            def nack():
+                channel.basic_nack(delivery_tag=method.delivery_tag)
+
+            # Who uses the middleware just need to call ack or nack
+            # "abstracting" the details of the middleware
+            on_message_callback(body, ack, nack)
+
+        try:
+            self.channel.basic_consume(queue=self.queue_name, on_message_callback=_on_message_callback_internal)
+            self.channel.start_consuming()
+
+        except pika.exceptions.AMQPConnectionError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
+        
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(str(error))
 
     def stop_consuming(self):
         pass
