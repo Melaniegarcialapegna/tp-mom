@@ -96,8 +96,18 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         self.consuming = False
 
     def send(self, message):
-        pass
+        try:
+            # Publish the message to all the routing keys
+            for routing_key in self.routing_keys:
+                self.channel.basic_publish(exchange=self.exchange_name, routing_key=routing_key, body=message)
+
+        except pika.exceptions.AMQPConnectionError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
         
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(str(error))
+
+
     def start_consuming(self, on_message_callback):
         pass
 
