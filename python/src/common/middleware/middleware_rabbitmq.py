@@ -1,9 +1,9 @@
 import pika
 import random
 import string
-from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 from .middleware import (
     MessageMiddlewareQueue,
+    MessageMiddlewareExchange,
     MessageMiddlewareMessageError,
     MessageMiddlewareDisconnectedError,
 )
@@ -89,9 +89,10 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         # Establish a blocking connection to RabbitMQ server
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
 
-        # Declare an exchange of type direct,
-        # it will be directed the messages to the queue with the same 
-        # routing key as it
+        self.channel = self.connection.channel()
+
+        # Declare an exchange of type direct
+        # it will be directed the messages to the queue with the same routing key as it
         self.channel.exchange_declare(exchange=self.exchange_name, exchange_type='direct')
 
         self.consuming = False
@@ -119,8 +120,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             def nack():
                 channel.basic_nack(delivery_tag=method.delivery_tag)
 
-            # Who uses the middleware just need to call ack or nack
-            # "abstracting" the details of the middleware
+            # Who uses the middleware just need to call ack or nack "abstracting" the details of the middleware
             on_message_callback(body, ack, nack)
 
         try:
@@ -139,8 +139,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             raise MessageMiddlewareMessageError(str(error))
 
         finally:
-            # Warranty that always the consuming flag is going to
-            # be false when the consuming finish or in case of error
+            # Warranty that always the consuming flag is going to be false when the consuming finish or in case of error
             self.consuming = False
 
     def stop_consuming(self):
@@ -161,8 +160,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             raise MessageMiddlewareDisconnectedError(str(error))
 
     def _setup_consumer(self):
-        # If is the firt time that the consumer is going to consume
-        # it needs to create a anonimus queue and bind it to the exchange
+        # If is the firt time that the consumer is going to consume, it needs to create a anonimus queue and bind it to the exchange
         result = self.channel.queue_declare(queue='', durable=True)
         self.queue_name = result.method.queue
 
