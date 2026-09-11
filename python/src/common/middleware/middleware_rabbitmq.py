@@ -74,7 +74,11 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             raise MessageMiddlewareDisconnectedError(str(error))
 
     def close(self):
-        pass
+        try:
+            self.connection.close()
+
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
