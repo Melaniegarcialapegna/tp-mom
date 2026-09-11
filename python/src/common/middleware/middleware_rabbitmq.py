@@ -79,6 +79,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
         except pika.exceptions.AMQPError as error:
             raise MessageMiddlewareDisconnectedError(str(error))
+        
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
@@ -143,10 +144,21 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             self.consuming = False
 
     def stop_consuming(self):
-        pass
+        if not self.consuming:
+            return
+        
+        try: 
+            self.channel.stop_consuming()
+
+        except pika.exceptions.AMQPConnectionError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
 
     def close(self):
-        pass
+        try:
+            self.connection.close()
+
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
 
     def _setup_consumer(self):
         # If is the firt time that the consumer is going to consume
