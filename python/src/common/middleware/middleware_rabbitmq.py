@@ -19,7 +19,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         self.channel = self.connection.channel()
 
         # Declare a queue with the specified name
-        self.channel.queue_declare(queue=self.queue_name)
+        self.channel.queue_declare(queue=self.queue_name,durable=True)
 
         self.consuming = False
 
@@ -95,6 +95,9 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
 
         self.consuming = False
 
+        # Just for consumer
+        self.queue_name = None
+
     def send(self, message):
         try:
             # Publish the message to all the routing keys
@@ -107,12 +110,50 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         except pika.exceptions.AMQPError as error:
             raise MessageMiddlewareMessageError(str(error))
 
-
     def start_consuming(self, on_message_callback):
-        pass
+        # Transform the format of pika to the format of the middleware
+        def _on_message_callback_internal(channel,method,propierties,body):
+            def ack():
+                channel.basic_ack(delivery_tag=method.delivery_tag)
+            def nack():
+                channel.basic_nack(delivery_tag=method.delivery_tag)
+
+            # Who uses the middleware just need to call ack or nack
+            # "abstracting" the details of the middleware
+            on_message_callback(body, ack, nack)
+
+        try:
+            if self.queue_name is None:
+                self._setup_consumer()
+
+            self.channel.basic_consume(queue=self.queue_name, on_message_callback=_on_message_callback_internal)
+            self.consuming = True
+
+            self.channel.start_consuming()
+
+        except pika.exceptions.AMQPConnectionError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
+
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(str(error))
+
+        finally:
+            # Warranty that always the consuming flag is going to
+            # be false when the consuming finish or in case of error
+            self.consuming = False
 
     def stop_consuming(self):
         pass
 
     def close(self):
         pass
+
+    def _setup_consumer(self):
+        # If is the firt time that the consumer is going to consume
+        # it needs to create a anonimus queue and bind it to the exchange
+        result = self.channel.queue_declare(queue='', durable=True)
+        self.queue_name = result.method.queue
+
+        # Bind the queue to the exchange with all the routing keys
+        for routing_key in self.routing_keys:
+            self.channel.queue_bind(exchange=self.exchange_name, queue=self.queue_name, routing_key=routing_key)
