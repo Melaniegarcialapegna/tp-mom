@@ -21,6 +21,8 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         # Declare a queue with the specified name
         self.channel.queue_declare(queue=self.queue_name)
 
+        self.consuming = False
+
     def send(self, message):
         try:
             # In routing key goes the name of the queue to which the message will be sent
@@ -48,6 +50,8 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             self.channel.basic_consume(queue=self.queue_name, on_message_callback=_on_message_callback_internal)
             self.channel.start_consuming()
 
+            self.consuming = True
+
         except pika.exceptions.AMQPConnectionError as error:
             raise MessageMiddlewareDisconnectedError(str(error))
         
@@ -55,7 +59,15 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             raise MessageMiddlewareMessageError(str(error))
 
     def stop_consuming(self):
-        pass
+        if not self.consuming:
+            return
+        
+        try: 
+            self.channel.stop_consuming()
+            self.consuming = False
+
+        except pika.exceptions.AMQPConnectionError as error:
+            raise MessageMiddlewareDisconnectedError(str(error))
 
     def close(self):
         pass
