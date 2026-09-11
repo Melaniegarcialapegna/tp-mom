@@ -48,9 +48,9 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
         try:
             self.channel.basic_consume(queue=self.queue_name, on_message_callback=_on_message_callback_internal)
-            self.channel.start_consuming()
-
             self.consuming = True
+
+            self.channel.start_consuming()
 
         except pika.exceptions.AMQPConnectionError as error:
             raise MessageMiddlewareDisconnectedError(str(error))
@@ -58,20 +58,23 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         except pika.exceptions.AMQPError as error:
             raise MessageMiddlewareMessageError(str(error))
 
+        finally:
+            # Warranty that always the consuming flag is going to
+            # be false when the consuming finish or in case of error
+            self.consuming = False
+
     def stop_consuming(self):
         if not self.consuming:
             return
         
         try: 
             self.channel.stop_consuming()
-            self.consuming = False
 
         except pika.exceptions.AMQPConnectionError as error:
             raise MessageMiddlewareDisconnectedError(str(error))
 
     def close(self):
         pass
-
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
