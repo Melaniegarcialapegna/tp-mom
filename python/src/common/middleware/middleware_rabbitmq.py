@@ -82,7 +82,18 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
-        pass
+        self.exchange_name = exchange_name
+        self.routing_keys = routing_keys
+
+        # Establish a blocking connection to RabbitMQ server
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
+
+        # Declare an exchange of type direct,
+        # it will be directed the messages to the queue with the same 
+        # routing key as it
+        self.channel.exchange_declare(exchange=self.exchange_name, exchange_type='direct')
+
+        self.consuming = False
 
     def send(self, message):
         pass
