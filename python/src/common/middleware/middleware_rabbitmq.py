@@ -6,9 +6,17 @@ from .middleware import (
     MessageMiddlewareExchange,
     MessageMiddlewareMessageError,
     MessageMiddlewareDisconnectedError,
+    MessageMiddlewareCloseError,
 )
 
-class MessageMiddlewareRabbitMQ():
+PIKA_DISCONNECTION_ERRORS = (
+    pika.exceptions.AMQPConnectionError,
+    pika.exceptions.ConnectionClosed,
+    pika.exceptions.ConnectionClosedByBroker,
+    pika.exceptions.StreamLostError,
+)
+
+class MessageMiddlewareRabbitMQ:
     """
     Abstract class that implements the common functionality of the MessageMiddlewareQueue and MessageMiddlewareExchange classes for RabbitMQ
     """
@@ -41,7 +49,7 @@ class MessageMiddlewareRabbitMQ():
 
             self.channel.start_consuming()
 
-        except pika.exceptions.AMQPConnectionError as error:
+        except PIKA_DISCONNECTION_ERRORS as error:
             raise MessageMiddlewareDisconnectedError(str(error))
         
         except pika.exceptions.AMQPError as error:
@@ -59,7 +67,7 @@ class MessageMiddlewareRabbitMQ():
         try: 
             self.channel.stop_consuming()
 
-        except pika.exceptions.AMQPConnectionError as error:
+        except PIKA_DISCONNECTION_ERRORS as error:
             raise MessageMiddlewareDisconnectedError(str(error))
 
     def close(self):
@@ -67,7 +75,7 @@ class MessageMiddlewareRabbitMQ():
             self.connection.close()
 
         except pika.exceptions.AMQPError as error:
-            raise MessageMiddlewareDisconnectedError(str(error))
+            raise MessageMiddlewareCloseError(str(error))
 
 
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareRabbitMQ,MessageMiddlewareQueue):
@@ -84,7 +92,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareRabbitMQ,MessageMiddleware
             # In routing key goes the name of the queue to which the message will be sent
             self.channel.basic_publish(exchange='', routing_key=self.queue_name, body=message)
 
-        except pika.exceptions.AMQPConnectionError as error:
+        except PIKA_DISCONNECTION_ERRORS as error:
             raise MessageMiddlewareDisconnectedError(str(error))
         
         except pika.exceptions.AMQPError as error:
@@ -109,7 +117,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareRabbitMQ,MessageMiddlew
             for routing_key in self.routing_keys:
                 self.channel.basic_publish(exchange=self.exchange_name, routing_key=routing_key, body=message)
 
-        except pika.exceptions.AMQPConnectionError as error:
+        except PIKA_DISCONNECTION_ERRORS as error:
             raise MessageMiddlewareDisconnectedError(str(error))
         
         except pika.exceptions.AMQPError as error:
